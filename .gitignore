@@ -1,0 +1,21 @@
+# temporary
+**.swp
+**~
+
+# generated files
+.build/
+bin/
+
+# condor
+condor/
+
+# backups
+**.tar.*
+
+data
+output
+tmp
+*.dat
+*.root
+*.pdf
+
