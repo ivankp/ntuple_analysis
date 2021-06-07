@@ -345,9 +345,13 @@ int main(int argc, char* argv[]) {
   hist_t h_##NAME(axes(STR(NAME))); \
   hists.emplace_back(STR(NAME),h_##NAME);
 
+  // Histograms of main observables #################################
+  // ################################################################
+
   h_(H_pT)
   h_(j1_pT)
 
+  // ################################################################
   // ----------------------------------------------------------------
   // FastJet
   const fastjet::JetDefinition jet_def = get(conf,"jets","algorithm");
