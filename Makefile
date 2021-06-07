@@ -2,8 +2,8 @@
 
 ifeq (0, $(words $(findstring $(MAKECMDGOALS), clean))) #############
 
-CPPFLAGS := -std=c++17 -Iinclude
-CXXFLAGS := -Wall -O3 -flto -fmax-errors=3
+CPPFLAGS := -std=c++20 -Iinclude
+CXXFLAGS := -Wall -O3 -flto -fmax-errors=3 -fconcepts-diagnostics-depth=3
 # CXXFLAGS := -Wall -g -fmax-errors=3
 
 # generate .d files during compilation
@@ -30,7 +30,7 @@ all: $(EXE)
 C_hist := $(ROOT_CPPFLAGS) $(FJ_CPPFLAGS) $(LHAPDF_CPPFLAGS)
 LF_hist := $(ROOT_LDFLAGS)
 L_hist := $(ROOT_LDLIBS) $(FJ_LDLIBS) $(LHAPDF_LDLIBS)
-bin/hist: .build/reweighter.o
+bin/hist: .build/reweighter.o .build/Higgs2diphoton.o
 
 C_reweighter := $(ROOT_CPPFLAGS)
 

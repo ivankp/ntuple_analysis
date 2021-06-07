@@ -3,23 +3,24 @@
     "files": [
       "/msu/data/t3work4/gosam_diphoton_jet/born/born1_1.root",
       "/msu/data/t3work4/gosam_diphoton_jet/born/born1_2.root"
-    ]
+    ],
+    "entries": 100000,
+    "tree": "t3"
   },
   "jets": {
     "algorithm": [ "antikt", 0.4 ],
     "cuts": { "eta": 4.4, "pt": 30 },
-    "njets_min": 1
+    "njets_min": 0
   },
   "photons": {
-    "cuts": true
+    "higgs_decay_seed": 0
   },
-  "binning": "hist.bins",
+  "binning": "binning.json",
   "output": "histograms.root",
-  "reweight": [{
+  "-reweight": [{
     "ren_fac": [ [1,1],[0.5,0.5],[1,0.5],[0.5,1],[2,1],[1,2],[2,2] ],
     "scale": "HT2",
     "pdf": "CT14nlo",
     "pdf_var": true
   }]
-
 }

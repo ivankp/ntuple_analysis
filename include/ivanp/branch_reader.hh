@@ -4,8 +4,8 @@
 // Writted by Ivan Pogrebnyak
 // ------------------------------------------------------------------
 
-#ifndef BRANCH_READER_HH
-#define BRANCH_READER_HH
+#ifndef IVANP_BRANCH_READER_HH
+#define IVANP_BRANCH_READER_HH
 
 #include <tuple>
 #include <algorithm>
@@ -17,8 +17,10 @@
 #include <TTreeReaderValue.h>
 #include <TTreeReaderArray.h>
 
-#include "traits.hh"
-#include "string.hh"
+#include "ivanp/traits.hh"
+#include "ivanp/string.hh"
+
+namespace ivanp {
 
 template <typename>
 constexpr const char* root_type_str();
@@ -173,5 +175,7 @@ public:
 
   auto size() const noexcept { return impl.GetSize(); }
 };
+
+} // end namespace ivanp
 
 #endif

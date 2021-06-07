@@ -1,0 +1,3 @@
+[submodule "histograms"]
+	path = histograms
+	url = git@github.com:ivankp/histograms.git

@@ -55,6 +55,11 @@ inline auto cat(const T&... x) -> std::enable_if_t<
   return cat(impl::to_string_view(x)...);
 }
 
+[[nodiscard]]
+inline const char* cstr(const char* x) noexcept { return x; }
+[[nodiscard]]
+inline const char* cstr(const std::string& x) noexcept { return x.c_str(); }
+
 struct chars_less {
   using is_transparent = void;
   bool operator()(const char* a, const char* b) const noexcept {

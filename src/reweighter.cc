@@ -6,7 +6,9 @@
 
 #include <LHAPDF/LHAPDF.h>
 
-#include "branch_reader.hh"
+#include "ivanp/branch_reader.hh"
+
+using ivanp::branch_reader;
 
 namespace {
 template <typename... T> [[gnu::always_inline]]
