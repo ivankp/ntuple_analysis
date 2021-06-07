@@ -36,7 +36,7 @@ jetR = 4 # jet radius ×10
 
 chunk_size = 25e6 # maximum number of events per job
 
-db = sqlite3.connect('/home/ivanp/work/ntuple_analysis/sql/ntuples.db')
+db = sqlite3.connect('../sql/ntuples.db')
 
 LD_LIBRARY_PATH = os.environ['LD_LIBRARY_PATH']
 

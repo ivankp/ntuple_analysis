@@ -586,7 +586,7 @@ int main(int argc, char* argv[]) {
 
     })( type_constant<bin_t>{} );
     ss << ']';
-    TNamed("categories",ss.str().c_str()).Write();
+    TNamed("tags",ss.str().c_str()).Write();
   }
 
   // write output ROOT file
