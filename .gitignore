@@ -6,12 +6,11 @@
 .build/
 bin/
 
-# condor
-condor/
-
 # backups
 **.tar.*
 
+condor/
+out
 data
 output
 tmp

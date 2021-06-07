@@ -273,6 +273,8 @@ int main(int argc, char* argv[]) {
   cout << endl;
 
   // Read branches
+  chain.LoadTree(-1); // Loads the first file and prevents a warning
+  // https://root-forum.cern.ch/t/using-ttreereader-with-tchain/27279
   TTreeReader reader(&chain);
   branch_reader<int>
     b_id(reader,"id"),
