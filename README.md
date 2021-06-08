@@ -11,7 +11,9 @@ I will continue adding to it to make it a comprehensive guide to working with Go
 
 # Quick start
 ## Check out the code
+```
 git clone --recursive git@github.com:ivankp/ntuple_analysis.git
+```
 
 Don't forget the `--recursive` argument to also clone the submodules.
 
