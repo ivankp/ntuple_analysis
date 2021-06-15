@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <fstream>
 #include <vector>
 #include <optional>
@@ -40,7 +41,6 @@ using nlohmann::json;
 using ivanp::cat; // concatenates strings
 using ivanp::vec4;
 using ivanp::branch_reader;
-using ivanp::type_constant;
 
 using namespace ivanp::cont::ops::map;
 
@@ -195,12 +195,45 @@ using hist_t = histogram<
   flags_spec< hist_flags::perbin_axes >
 >;
 
-TH1D* make_th1d(const char* name, const uniform_axis<>& ax) {
+template <typename T, bool FirstTag = true>
+void save_tags_impl(std::stringstream& ss) {
+  if constexpr (!FirstTag) ss << ',';
+  ss << '[' << std::quoted(T::name) << ",[";
+  { bool first = true;
+    for (auto tag : T::tags) {
+      if (first) first = false;
+      else ss << ',';
+      ss << std::quoted(tag);
+    }
+  }
+  ss << "]]";
+
+  using type = std::remove_cvref_t<
+    decltype(std::declval<const T&>()[{}]) >;
+  if constexpr (!std::is_same_v<type,basic_bin_t>)
+    save_tags_impl<type,false>(ss);
+}
+void save_tags() {
+  std::stringstream ss;
+  ss << '[';
+  save_tags_impl<bin_t>(ss);
+  ss << ']';
+  TNamed("tags",ss.str().c_str()).Write();
+}
+
+TH1D* make_root_hist(const char* name, const uniform_axis<>& ax) {
   return new TH1D(name,"",ax.ndiv(),ax.min(),ax.max());
 }
-TH1D* make_th1d(const char* name, const cont_axis<>& ax) {
+TH1D* make_root_hist(const char* name, const cont_axis<>& ax) {
   return new TH1D(name,"",ax.ndiv(),ax.edges().data());
 }
+
+std::string bin_str(const auto& axis, unsigned i) {
+  std::stringstream ss;
+  ss << "_[" << axis.lower(i) << ',' << axis.upper(i) << ')';
+  return std::move(ss).str();
+}
+
 // ------------------------------------------------------------------
 
 bool photon_eta_cut(double abs_eta) noexcept {
@@ -324,7 +357,8 @@ int main(int argc, char* argv[]) {
     auto& defs = get(conf,"binning");
     if (defs.is_string())
       return read_json(get_str(defs).c_str());
-    else return defs;
+    else
+      return defs;
   }()](const char* name) -> auto& {
     std::cmatch m;
     for (const auto& [r,a] : axes)
@@ -545,20 +579,65 @@ int main(int argc, char* argv[]) {
         );
     } else {
       dir->cd();
-      for (auto& [name,h] : hists) {
-        TH1D* th = std::visit([&](const auto& ax){
-          return make_th1d(name,ax);
-        },*h.axes()[0][0]);
-        th->Sumw2(true);
-        auto* w  = th->GetArray();
-        auto* w2 = th->GetSumw2()->GetArray();
-        const auto& bins = h.bins();
-        const unsigned nbins = bins.size();
-        for (unsigned i=0; i<nbins; ++i) {
-          const auto& bin = get(bins[i]);
-          w [i] = bin.w;
-          w2[i] = bin.w2;
+      double *w, *w2;
+      for (const auto& [name,h] : hists) {
+        const auto& axes = h.axes();
+        const unsigned ndim = axes.size(), ndim1 = ndim ? ndim-1 : 0;
+        struct indices {
+          unsigned
+             i = 0, // bin index in the axes
+            ni = 0, // number of bins in current axis
+             a = 0, // axis index in this dimension
+            na = 0; // number of axes in this dimension
+        };
+        std::vector<indices> ii(ndim);
+        for (unsigned d=ndim; d--; )
+          ii[d].na = axes[d].size();
+        std::vector<std::string> bins_names(ndim1);
+
+        for (auto bin_it = h.bins().begin();;) { // bin loop
+          for (unsigned d=ndim1; ; ) { // label bins
+            if (d!=0 && ii[d].i==0) {
+              auto& [i,ni,a,na] = ii[--d];
+              bins_names[d] = bin_str(axes[d][a],i);
+            } else break;
+          }
+          for (unsigned d=ndim; d--; ) { // increment indices
+            auto& [i,ni,a,na] = ii[d];
+            if (i==0) {
+              const auto& axis = axes[d][a];
+              ni = axis.nbins();
+              if (d==ndim1) {
+                size_t len = strlen(name);
+                for (const auto& s : bins_names)
+                  len += s.size();
+                std::string name2;
+                name2.reserve(len);
+                name2 += name;
+                for (const auto& s : bins_names)
+                  name2 += s;
+
+                TH1D* h = std::visit([&](const auto& ax){
+                  return make_root_hist(name2.c_str(),ax);
+                },*axis);
+                h->Sumw2(true);
+                w  = h->GetArray();
+                w2 = h->GetSumw2()->GetArray();
+              }
+            }
+            if ((++i)>=ni) { // carry over
+              i = 0;
+              if (d) { // next axis
+                if (a+1 < na) ++a;
+              } else goto end_bin_loop;
+            } else break;
+          }
+
+          const auto& bin = get(*bin_it++);
+          *w ++ = bin.w;
+          *w2++ = bin.w2;
         }
+end_bin_loop: ;
       }
     }
   })(
@@ -567,31 +646,7 @@ int main(int argc, char* argv[]) {
   );
 
   fout.cd();
-  { std::stringstream ss;
-    ss << '[';
-    bool first = true;
-    Ycombinator([&]<typename T>(auto f, type_constant<T>){
-      if (first) first = false;
-      else ss << ',';
-      ss << "[\"" << T::name << "\",[";
-      { bool first = true;
-        for (auto tag : T::tags) {
-          if (first) first = false;
-          else ss << ',';
-          ss << '"' << tag << '"';
-        }
-      }
-      ss << "]]";
-
-      using type = std::remove_cvref_t<
-        decltype(std::declval<const T&>()[{}]) >;
-      if constexpr (!std::is_same_v<type,basic_bin_t>)
-        f(type_constant<type>{});
-
-    })( type_constant<bin_t>{} );
-    ss << ']';
-    TNamed("tags",ss.str().c_str()).Write();
-  }
+  save_tags();
 
   // write output ROOT file
   fout.Write(0,TObject::kOverwrite);
