@@ -10,6 +10,7 @@ bin/
 **.tar.*
 
 condor/
+condor_*/
 out
 data
 output

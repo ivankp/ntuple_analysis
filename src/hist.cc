@@ -385,6 +385,8 @@ int main(int argc, char* argv[]) {
   h_(H_pT)
   h_(j1_pT)
 
+  h_(H_pT__Hj_mass)
+
   // ################################################################
   // ----------------------------------------------------------------
   // FastJet
@@ -551,6 +553,10 @@ int main(int argc, char* argv[]) {
 
     const double j1_pT = jets[0].pt();
     h_j1_pT(j1_pT);
+
+    const auto Hj = higgs + jets[0];
+    const double Hj_mass = Hj.m();
+    h_H_pT__Hj_mass(H_pT,Hj_mass);
 
     // ##############################################################
   } // end event loop

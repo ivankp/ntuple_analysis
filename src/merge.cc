@@ -67,6 +67,7 @@ void print_usage(const char* prog) {
   cout << "usage: " << prog << " [options ...] output.root [input.root ...]\n"
     "  -e           scale and pdf envelopes\n"
     "  -x           convert weight to cross section\n"
+    "               and divide by bin width\n"
     "  -h, --help   display this help text and exit\n";
 }
 
@@ -74,6 +75,15 @@ int main(int argc, char* argv[]) {
   if (argc < 2) {
     print_usage(argv[0]);
     return 1;
+  }
+  for (int i=1; i<argc; ++i) {
+    const char* arg = argv[i];
+    if (*(arg++)=='-' && *(arg++)=='-') {
+      if (!strcmp(arg,"help")) {
+        print_usage(argv[0]);
+        return 0;
+      }
+    }
   }
   for (int o; (o = getopt(argc,argv,"hxe")) != -1; ) {
     switch (o) {
@@ -98,7 +108,7 @@ int main(int argc, char* argv[]) {
     TFile fin(argv[i]);
     if (fin.IsZombie()) return 1;
 
-    TObject* tags = fin.Get("categories");
+    TObject* tags = fin.Get("tags");
     if (first && tags) {
       cout << tags->GetTitle() << endl;
       tags1 = tags->Clone();
@@ -113,7 +123,7 @@ int main(int argc, char* argv[]) {
     loop_add(&fout,&fin,first);
   }
   fout.cd();
-  tags1->Write();
+  if (tags1) tags1->Write();
 
   fout.Write(0,TObject::kOverwrite);
 }

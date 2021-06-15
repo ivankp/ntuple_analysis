@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
 
-import sys, os, sqlite3, json, re, argparse
+import sys, os, sqlite3, json, re, argparse, time
 from subprocess import Popen, PIPE
 from collections import defaultdict
 from itertools import product
 
-argparser = argparse.ArgumentParser()
+argparser = argparse.ArgumentParser(
+    formatter_class=argparse.ArgumentDefaultsHelpFormatter
+)
 argparser.add_argument('-t','--test',action='store_true',
     help='do not submit condor jobs')
+argparser.add_argument('-r', type=float, default=4,
+    help='jet radius ×10')
+argparser.add_argument('-n', type=int, default=int(25e6),
+    help='maximum number of events per job')
 args = argparser.parse_args()
 print(args)
 
@@ -19,22 +25,19 @@ def mkdirs(*ds):
 exe = '../../bin/hist'
 
 selection = [{
-    'part': ['B','RS','I','V'],
+    'part': ['B'],
+    # 'part': ['B','RS','I','V'],
     'njets': [1],
     'particle': ['H'],
     'energy': [13],
     'info': ['GGFHT pt25.0 eta4.5']
-},{
-    'part': ['B','RS','I','V'],
-    'njets': [2,3],
-    'particle': ['H'],
-    'energy': [13],
-    'info': ['ED GGFHT pt25.0 eta4.5']
+# },{
+#     'part': ['B','RS','I','V'],
+#     'njets': [2,3],
+#     'particle': ['H'],
+#     'energy': [13],
+#     'info': ['ED GGFHT pt25.0 eta4.5']
 }]
-
-jetR = 4 # jet radius ×10
-
-chunk_size = 25e6 # maximum number of events per job
 
 db = sqlite3.connect('../sql/ntuples.db')
 
@@ -72,7 +75,7 @@ def make_chunks(names,vals):
         f'{x[2]}{x[3]}j{x[4]}_{x[5]:g}TeV' \
         + ('_'+('mtop' if ('mtop' in x[6]) else 'eft') if do_mtop else '') \
         + ('_'+diagram(x[6]) if do_diag else '') \
-        + f'_antikt{jetR:g}'
+        + f'_antikt{args.r:g}'
     ) for x in db.execute('''
 SELECT dir,file,particle,njets,part,energy,info,nentries
 FROM ntuples
@@ -94,7 +97,7 @@ WHERE
             chunks.append(( f'{pref}_{subcount[pref]:0>3d}', [], f[3], f[2] ))
         chunks[-1][1].append(f[1])
         n += f[0]
-        if n >= chunk_size:
+        if n >= args.n:
             n = 0
 
     return chunks
@@ -111,7 +114,7 @@ export LD_LIBRARY_PATH={LD_LIBRARY_PATH}\n
         'rootS': chunk[2],
         'jets': {
             'cuts': { 'pt': 30, 'eta': 4.4 },
-            'algorithm': [ 'antikt', jetR*0.1 ],
+            'algorithm': [ 'antikt', args.r*0.1 ],
             'njets_min': chunk[3]
         },
         'binning': '../binning.json',
@@ -120,8 +123,9 @@ export LD_LIBRARY_PATH={LD_LIBRARY_PATH}\n
 
     os.chmod(script,0o775)
 
-mkdirs('condor','out')
-os.chdir('condor')
+condor_dir = f'condor_{int(time.time()*1000)}'
+mkdirs(condor_dir,'out')
+os.chdir(condor_dir)
 
 with open('finish.sh','w') as f:
     f.write(f'''\
