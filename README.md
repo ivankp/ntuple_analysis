@@ -10,6 +10,14 @@ This readme is a work in progress.
 I will continue adding to it to make it a comprehensive guide to working with GoSam ntuples.
 
 # Quick start
+## Check out the code
+```
+git clone --recursive git@github.com:ivankp/ntuple_analysis.git
+```
+
+Don't forget the `--recursive` argument to also clone the submodules.
+
+## How to run
 1. Edit `src/hist.cc`. This is the program that reads the ntuples and fills defined histograms.
 It also does reweighting.
 2. Add histograms' definitions
