@@ -30,35 +30,25 @@ bool inherits_from(TClass* c) {
   return c->InheritsFrom(T::Class());
 }
 
-void loop_add(TDirectory* out, TDirectory* in, bool first) {
+template <typename F>
+void loop(TDirectory* out, TDirectory* in, bool first, F&& f) {
   for (TObject* key : *in->GetListOfKeys()) {
     const char* const name = key->GetName();
     const char* const class_name = static_cast<TKey*>(key)->GetClassName();
     TClass* const class_ptr = get_class(class_name);
-
-    if (inherits_from<TDirectory>(class_ptr)) {
-      // cout << "dir  " << name << endl;
-      loop_add(
+    if (inherits_from<TDirectory>(class_ptr))
+      loop(
         first
         ? out->mkdir(name)
         : &dynamic_cast<TDirectory&>(*out->Get(name)),
         static_cast<TDirectory*>(static_cast<TKey*>(key)->ReadObj()),
-        first
+        first,
+        f
       );
-    } else if (inherits_from<TH1>(class_ptr)) {
-      // cout << "hist " << name << endl;
-      auto* hin  = static_cast<TH1*>(static_cast<TKey*>(key)->ReadObj());
-      if (first) {
-        out->cd();
-        hin->Clone();
-      } else {
-        dynamic_cast<TH1&>(*out->Get(name)).Add(hin);
-      }
-    }
+    else
+      f(out,static_cast<TKey*>(key),class_ptr,first);
   }
 }
-
-// cout << "usage: " << argv[0] << " output.root input.root ...\n";
 
 bool opt_x = false, opt_e = false;
 #define TOGGLE(x) x = !x
@@ -120,7 +110,19 @@ int main(int argc, char* argv[]) {
       return 1;
     }
 
-    loop_add(&fout,&fin,first);
+    loop(&fout,&fin,first,[](
+      TDirectory* out, TKey* key, TClass* class_ptr, bool first
+    ){
+      if (inherits_from<TH1>(class_ptr)) {
+        auto* h  = static_cast<TH1*>(key->ReadObj());
+        if (first) {
+          out->cd();
+          h->Clone();
+        } else {
+          dynamic_cast<TH1&>(*out->Get(key->GetName())).Add(h);
+        }
+      }
+    });
   }
   fout.cd();
   if (tags1) tags1->Write();
