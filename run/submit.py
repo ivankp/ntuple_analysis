@@ -10,10 +10,12 @@ argparser = argparse.ArgumentParser(
 )
 argparser.add_argument('-t','--test',action='store_true',
     help='do not submit condor jobs')
-argparser.add_argument('-r', type=float, default=4,
-    help='jet radius ×10')
+argparser.add_argument('-r', type=float, default=0.4,
+    help='jet radius')
 argparser.add_argument('-n', type=int, default=int(25e6),
     help='maximum number of events per job')
+argparser.add_argument('-m',action='store_true',
+    help='add "+IsMediumJob = True" to condor jobs')
 args = argparser.parse_args()
 print(args)
 
@@ -75,7 +77,7 @@ def make_chunks(names,vals):
         f'{x[2]}{x[3]}j{x[4]}_{x[5]:g}TeV' \
         + ('_'+('mtop' if ('mtop' in x[6]) else 'eft') if do_mtop else '') \
         + ('_'+diagram(x[6]) if do_diag else '') \
-        + f'_antikt{args.r:g}'
+        + f'_antikt{args.r*10:g}'
     ) for x in db.execute('''
 SELECT dir,file,particle,njets,part,energy,info,nentries
 FROM ntuples
@@ -102,6 +104,12 @@ WHERE
 
     return chunks
 
+t = f'_{int(time.time()*1000)}'
+condor_dir = 'condor'+t
+out_dir = 'out'+t
+mkdirs(condor_dir,out_dir)
+os.chdir(condor_dir)
+
 def make_job(chunk):
     script = chunk[0]+'.sh'
     with open(script,'w') as f:
@@ -114,26 +122,22 @@ export LD_LIBRARY_PATH={LD_LIBRARY_PATH}\n
         'rootS': chunk[2],
         'jets': {
             'cuts': { 'pt': 30, 'eta': 4.4 },
-            'algorithm': [ 'antikt', args.r*0.1 ],
+            'algorithm': [ 'antikt', args.r ],
             'njets_min': chunk[3]
         },
         'binning': '../binning.json',
-        'output': '../out/'+chunk[0]+'.root'
+        'output': f'../{out_dir}/{chunk[0]}.root'
     }, indent=2, separators=(',',': ')) + '\nCARD\n')
 
     os.chmod(script,0o775)
-
-condor_dir = f'condor_{int(time.time()*1000)}'
-mkdirs(condor_dir,'out')
-os.chdir(condor_dir)
 
 with open('finish.sh','w') as f:
     f.write(f'''\
 #!/bin/bash
 export LD_LIBRARY_PATH={LD_LIBRARY_PATH}
 cd ..
-./merge.sh
-./db.sh
+[ -x 'merge.sh' ] && ./merge.sh {out_dir} merged{t}
+[ -x 'finish.sh' ] && ./finish.sh
 ''')
 os.chmod('finish.sh',0o775)
 
@@ -145,8 +149,8 @@ Output     = $(name).out
 Error      = $(name).err
 Log        = $(name).log
 getenv = True
-+IsMediumJob = True
-queue
+''' + ('+IsMediumJob = True\n' if args.m else '') +
+'''queue
 ''')
 
 with open('jobs.dag','w') as f:

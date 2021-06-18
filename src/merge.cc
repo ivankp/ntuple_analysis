@@ -66,16 +66,14 @@ void loop_add(TDirectory* out, TDirectory* in, bool first) {
 
 template <bool first=true>
 void loop_xsec(TDirectory* dir, double factor) {
-  for (TObject* key : *dir->GetListOfKeys()) {
-    TClass* const class_ptr = get_class(
-      static_cast<TKey*>(key)->GetClassName() );
+  for (TObject* obj : *dir->GetList()) {
+    TClass* const class_ptr = get_class(obj->ClassName());
     if (inherits_from<TDirectory>(class_ptr)) {
-      loop_xsec<false>( read_key<TDirectory>(key), factor );
+      loop_xsec<false>( static_cast<TDirectory*>(obj), factor );
     } else if (inherits_from<TH1>(class_ptr)) {
-      TH1* h = read_key<TH1>(key);
       if constexpr (first)
-        if (!strcmp(h->GetName(),"N")) continue;
-      h->Scale(factor,"width");
+        if (!strcmp(obj->GetName(),"N")) continue;
+      static_cast<TH1*>(obj)->Scale(factor,"width");
     }
   }
 }
@@ -84,7 +82,7 @@ bool opt_x = false, opt_e = false;
 #define TOGGLE(x) x = !x
 
 void print_usage(const char* prog) {
-  cout << "usage: " << prog << " [options ...] output.root [input.root ...]\n"
+  cout << "usage: " << prog << " [options ...] output.root input1.root [...]\n"
     "  -e           scale and pdf envelopes\n"
     "  -x           convert weight to cross section\n"
     "               and divide by bin width\n"
@@ -130,7 +128,7 @@ int main(int argc, char* argv[]) {
 
     TObject* tags = fin.Get("tags");
     if (first && tags) {
-      cout << tags->GetTitle() << endl;
+      // cout << tags->GetTitle() << endl;
       tags1 = tags->Clone();
     } else if (
       ( (!tags) != (!tags1) ) ||
@@ -146,7 +144,16 @@ int main(int argc, char* argv[]) {
   if (opt_x) { // convert weight to cross section and divide by bin width
     TH1* N = get_obj<TH1*>(&fout,"N");
     if (N) {
-      loop_xsec(&fout,1./N->GetBinContent(1));
+      const double
+        scale = N->GetBinContent(1),
+        count = N->GetBinContent(2);
+      if (scale==count) {
+        cout << "scaling to cross section, 1/" << scale << endl;
+        loop_xsec(&fout,1./scale);
+        N->SetBinContent(1,1);
+      } else {
+        cerr << "input histograms appear to have already been scaled" << endl;
+      }
     } else {
       cerr << "cannot scale to cross section without \"N\" histogram" << endl;
     }
