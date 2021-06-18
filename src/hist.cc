@@ -426,9 +426,14 @@ int main(int argc, char* argv[]) {
     } else {
       ents.get_to(entries_range[1]);
     }
+    if (entries_range[0] > entries_range[1])
+      std::swap(entries_range[0],entries_range[1]);
     if (entries_range[1] > Nentries)
       entries_range[1] = Nentries;
-    reader.SetEntriesRange(entries_range[0],entries_range[1]);
+    if (entries_range != decltype(entries_range){ 0, Nentries }) {
+      Nentries = entries_range[1] - entries_range[0];
+      reader.SetEntriesRange(entries_range[0],entries_range[1]);
+    }
     cout << "Range of entries: "
       << entries_range[0] << " - " << entries_range[1] << endl;
   } catch (...) { }
@@ -652,6 +657,17 @@ end_bin_loop: ;
   );
 
   fout.cd();
+  { TH1D* N = new TH1D("N","",4,0,4);
+    TAxis* a = N->GetXaxis();
+    a->SetBinLabel(1,"scale");
+    a->SetBinLabel(2,"count");
+    a->SetBinLabel(3,"events");
+    a->SetBinLabel(4,"entries");
+    N->SetBinContent(1,Ncount);
+    N->SetBinContent(2,Ncount);
+    N->SetBinContent(3,Nevents);
+    N->SetBinContent(4,Nentries);
+  }
   save_tags();
 
   // write output ROOT file

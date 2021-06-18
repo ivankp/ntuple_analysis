@@ -29,24 +29,54 @@ template <typename T>
 bool inherits_from(TClass* c) {
   return c->InheritsFrom(T::Class());
 }
+template <typename T>
+T* read_key(TObject* key) {
+  return static_cast<T*>(static_cast<TKey*>(key)->ReadObj());
+}
+template <typename T>
+T get_obj(TDirectory* dir, const char* name) {
+  if constexpr (std::is_pointer_v<T>)
+    return dynamic_cast<T>(dir->Get(name));
+  else
+    return dynamic_cast<T&>(*dir->Get(name));
+}
 
-template <typename F>
-void loop(TDirectory* out, TDirectory* in, bool first, F&& f) {
+void loop_add(TDirectory* out, TDirectory* in, bool first) {
   for (TObject* key : *in->GetListOfKeys()) {
     const char* const name = key->GetName();
     const char* const class_name = static_cast<TKey*>(key)->GetClassName();
     TClass* const class_ptr = get_class(class_name);
-    if (inherits_from<TDirectory>(class_ptr))
-      loop(
+    if (inherits_from<TDirectory>(class_ptr)) {
+      loop_add(
+        first ? out->mkdir(name) : &get_obj<TDirectory&>(out,name),
+        read_key<TDirectory>(key),
         first
-        ? out->mkdir(name)
-        : &dynamic_cast<TDirectory&>(*out->Get(name)),
-        static_cast<TDirectory*>(static_cast<TKey*>(key)->ReadObj()),
-        first,
-        f
       );
-    else
-      f(out,static_cast<TKey*>(key),class_ptr,first);
+    } else if (inherits_from<TH1>(class_ptr)) {
+      TH1* h = read_key<TH1>(key);
+      if (first) {
+        out->cd();
+        h->Clone();
+      } else {
+        get_obj<TH1&>(out,name).Add(h);
+      }
+    }
+  }
+}
+
+template <bool first=true>
+void loop_xsec(TDirectory* dir, double factor) {
+  for (TObject* key : *dir->GetListOfKeys()) {
+    TClass* const class_ptr = get_class(
+      static_cast<TKey*>(key)->GetClassName() );
+    if (inherits_from<TDirectory>(class_ptr)) {
+      loop_xsec<false>( read_key<TDirectory>(key), factor );
+    } else if (inherits_from<TH1>(class_ptr)) {
+      TH1* h = read_key<TH1>(key);
+      if constexpr (first)
+        if (!strcmp(h->GetName(),"N")) continue;
+      h->Scale(factor,"width");
+    }
   }
 }
 
@@ -66,7 +96,7 @@ int main(int argc, char* argv[]) {
     print_usage(argv[0]);
     return 1;
   }
-  for (int i=1; i<argc; ++i) {
+  for (int i=1; i<argc; ++i) { // long options
     const char* arg = argv[i];
     if (*(arg++)=='-' && *(arg++)=='-') {
       if (!strcmp(arg,"help")) {
@@ -75,7 +105,7 @@ int main(int argc, char* argv[]) {
       }
     }
   }
-  for (int o; (o = getopt(argc,argv,"hxe")) != -1; ) {
+  for (int o; (o = getopt(argc,argv,"hxe")) != -1; ) { // short options
     switch (o) {
       case 'h': print_usage(argv[0]); return 0;
       case 'x': TOGGLE(opt_x); break;
@@ -85,14 +115,14 @@ int main(int argc, char* argv[]) {
   }
 
   cout << "output: " << argv[optind] << endl;
-  TFile fout(argv[optind],"recreate");
+  TFile fout(argv[optind],"recreate"); // open output file
   if (fout.IsZombie()) return 1;
   fout.SetCompressionAlgorithm(ROOT::kLZMA);
   fout.SetCompressionLevel(9);
   ++optind;
 
   TObject* tags1 { };
-  for (int i=optind; i<argc; ++i) {
+  for (int i=optind; i<argc; ++i) { // loop over input files
     const bool first = (i==optind);
     cout << "input: " << argv[i] << endl;
     TFile fin(argv[i]);
@@ -110,20 +140,18 @@ int main(int argc, char* argv[]) {
       return 1;
     }
 
-    loop(&fout,&fin,first,[](
-      TDirectory* out, TKey* key, TClass* class_ptr, bool first
-    ){
-      if (inherits_from<TH1>(class_ptr)) {
-        auto* h  = static_cast<TH1*>(key->ReadObj());
-        if (first) {
-          out->cd();
-          h->Clone();
-        } else {
-          dynamic_cast<TH1&>(*out->Get(key->GetName())).Add(h);
-        }
-      }
-    });
+    loop_add(&fout,&fin,first);
   }
+
+  if (opt_x) { // convert weight to cross section and divide by bin width
+    TH1* N = get_obj<TH1*>(&fout,"N");
+    if (N) {
+      loop_xsec(&fout,1./N->GetBinContent(1));
+    } else {
+      cerr << "cannot scale to cross section without \"N\" histogram" << endl;
+    }
+  }
+
   fout.cd();
   if (tags1) tags1->Write();
 
