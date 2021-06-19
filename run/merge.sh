@@ -2,7 +2,7 @@
 set -e
 err(){ echo "$1" >&2; exit 1; }
 
-[ "$#" -ne 2 ] && err "usage: $0 input merged"
+[ "$#" -ne 2 ] && err "usage: $0 input_dir merged_dir"
 [ ! -d "$1"  ] && err "input directory \"$1\" does not exist"
 
 path='.'

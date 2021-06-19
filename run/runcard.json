@@ -1,10 +1,9 @@
 {
   "input": {
     "files": [
-      "/msu/data/t3work4/gosam_diphoton_jet/born/born1_1.root",
-      "/msu/data/t3work4/gosam_diphoton_jet/born/born1_2.root"
+      "/msu/data/t3work4/luisonig/H1jets_ggf/NTuplesFiles/H1.0j_GGFHT_B_6500_pt25.0_eta4.5_r100_100.root"
     ],
-    "entries": 100000,
+    "-entries": 2,
     "tree": "t3"
   },
   "jets": {

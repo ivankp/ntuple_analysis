@@ -96,9 +96,9 @@ struct initial_state {
     "all", "gg", "gq", "qq"
   };
   inline static unsigned index;
-  static void set(int a, int b) noexcept {
-    const bool ag = (a==21), bg = (b==21);
-    index = ( ag!=bg ? 2 : ( ag ? 1 : 3 ) );
+  static void set(int id1, int id2) noexcept {
+    const bool g1 = (id1 == 21), g2 = (id2 == 21);
+    index = ( g1!=g2 ? 2 : ( g1 ? 1 : 3 ) );
   }
 };
 template <typename Bin>
@@ -107,6 +107,10 @@ struct initial_state_tag: initial_state {
   void operator+=(double w) noexcept {
     bins[0] += w;
     bins[index] += w;
+  }
+  void finalize() noexcept {
+    for (auto& bin : bins)
+      bin.finalize();
   }
   const Bin& operator[](size_t i) const noexcept { return bins[i]; }
 };
@@ -128,6 +132,10 @@ struct photon_cuts_tag: photon_cuts {
     bins[0] += w;
     if (pass) bins[1] += w;
   }
+  void finalize() noexcept {
+    for (auto& bin : bins)
+      bin.finalize();
+  }
   const Bin& operator[](size_t i) const noexcept { return bins[i]; }
 };
 
@@ -136,47 +144,39 @@ struct multiweight {
   inline static std::vector<std::string> tags;
 };
 template <typename Bin>
-struct multiweight_tag: multiweight {
-  // handle NLO MC with multiple entries per event and multiple weights
+struct multiweight_tag: multiweight { // handle multiple weights
   std::vector<Bin> bins;
-  std::vector<double> wsum;
-  int prev_id = -1;
 
-  multiweight_tag(): bins(weights.size()), wsum(weights.size()) { }
+  multiweight_tag(): bins(weights.size()) { }
   void operator++() noexcept {
-    size_t i = weights.size();
-    if (prev_id != event_id) {
-      while (i) { --i;
-        auto& w = wsum[i];
-        bins[i] += w;
-        w = weights[i];
-      }
-    } else {
-      while (i) { --i;
-        wsum[i] += weights[i];
-      }
-    }
+    for (size_t i = weights.size(); i--; )
+      bins[i] += weights[i];
   }
   void finalize() noexcept {
-    size_t i = weights.size();
-    while (i) { --i;
-      auto& w = wsum[i];
-      bins[i] += w;
-      w = 0;
-    }
+    for (auto& bin : bins)
+      bin.finalize();
   }
   const Bin& operator[](size_t i) const noexcept { return bins[i]; }
 };
 
-struct basic_bin_t {
-  double w=0, w2=0;
+struct basic_bin_t { // handle NLO MC multiple entries per event
+  double w=0, w2=0, sumw=0;
+  int prev_id = -1;
   void operator+=(double weight) noexcept {
-    w += weight;
-    w2 += weight*weight;
+    if (prev_id != event_id) {
+      w += sumw;
+      w2 += sumw*sumw;
+      sumw = weight;
+      prev_id = event_id;
+    } else {
+      sumw += weight;
+    }
   }
-  void operator+=(const basic_bin_t& o) noexcept {
-    w += o.w;
-    w2 += o.w2;
+  void finalize() noexcept {
+    w += sumw;
+    w2 += sumw*sumw;
+    sumw = 0;
+    prev_id = -1;
   }
 };
 
@@ -490,6 +490,16 @@ int main(int argc, char* argv[]) {
       return 1;
     }
 
+    // set weights --------------------------------------------------
+    { auto w = weights.begin();
+      *w = *b_weight2;
+      for (auto& rew : reweighters) {
+        rew(); // reweight this event
+        for (unsigned i=0, n=rew.nweights(); i<n; ++i)
+          *++w = rew[i];
+      }
+    }
+
     // tag initial state --------------------------------------------
     initial_state::set(*b_id1,*b_id2);
 
@@ -528,16 +538,6 @@ int main(int argc, char* argv[]) {
     std::sort( jets.begin(), jets.end(), // sort by pT
       [](const auto& a, const auto& b){ return ( a.pt() > b.pt() ); });
     const unsigned njets = jets.size(); // number of clustered jets
-
-    // set weights --------------------------------------------------
-    { auto w = weights.begin();
-      *w = *b_weight2;
-      for (auto& rew : reweighters) {
-        rew(); // reweight this event
-        for (unsigned i=0, n=rew.nweights(); i<n; ++i)
-          *++w = rew[i];
-      }
-    }
 
     // Fill Njets histograms
     h_Njets_excl(njets);
