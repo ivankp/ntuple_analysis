@@ -8,14 +8,16 @@ from itertools import product
 argparser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
 )
-argparser.add_argument('-t','--test',action='store_true',
-    help='do not submit condor jobs')
-argparser.add_argument('-r', type=float, default=0.4,
-    help='jet radius')
-argparser.add_argument('-n', type=int, default=int(25e6),
-    help='maximum number of events per job')
 argparser.add_argument('-m',action='store_true',
     help='add "+IsMediumJob = True" to condor jobs')
+argparser.add_argument('-n', type=int, default=int(25e6),
+    help='maximum number of events per job')
+argparser.add_argument('-r', type=float, default=0.4,
+    help='jet radius')
+argparser.add_argument('-t', type=str, default=f'{int(time.time()*1000)}',
+    help='set run tag')
+argparser.add_argument('-x',action='store_true',
+    help='generate job scripts but don\'t submit')
 args = argparser.parse_args()
 print(args)
 
@@ -27,8 +29,7 @@ def mkdirs(*ds):
 exe = '../../bin/hist'
 
 selection = [{
-    'part': ['B'],
-    # 'part': ['B','RS','I','V'],
+    'part': ['B','RS','I','V'],
     'njets': [1],
     'particle': ['H'],
     'energy': [13],
@@ -104,9 +105,10 @@ WHERE
 
     return chunks
 
-t = f'_{int(time.time()*1000)}'
-condor_dir = 'condor'+t
-out_dir = 'out'+t
+args.t = '_'+re.sub(r'\s+','-',args.t)
+condor_dir = 'condor'+args.t
+out_dir = 'out'+args.t
+merged_dir = 'merged'+args.t
 mkdirs(condor_dir,out_dir)
 os.chdir(condor_dir)
 
@@ -126,7 +128,15 @@ export LD_LIBRARY_PATH={LD_LIBRARY_PATH}\n
             'njets_min': chunk[3]
         },
         'binning': '../binning.json',
-        'output': f'../{out_dir}/{chunk[0]}.root'
+        'output': f'../{out_dir}/{chunk[0]}.root',
+        'reweighting': [{
+            'pdf': 'CT14nlo',
+            'pdf_var': True,
+            'ren_fac': [
+                [1,1], [0.5,0.5], [1,0.5], [0.5,1], [2,1], [1,2], [2,2]
+            ],
+            'scale': 'HT2'
+        }]
     }, indent=2, separators=(',',': ')) + '\nCARD\n')
 
     os.chmod(script,0o775)
@@ -136,7 +146,7 @@ with open('finish.sh','w') as f:
 #!/bin/bash
 export LD_LIBRARY_PATH={LD_LIBRARY_PATH}
 cd ..
-[ -x 'merge.sh' ] && ./merge.sh {out_dir} merged{t}
+[ -x 'merge.sh' ] && ./merge.sh {out_dir} {merged_dir}
 [ -x 'finish.sh' ] && ./finish.sh
 ''')
 os.chmod('finish.sh',0o775)
@@ -168,6 +178,7 @@ JOB finish job.sub
 VARS finish name="finish"\n
 PARENT '''+(' '.join(f'j{i}' for i in range(n)))+' CHILD finish\n')
 
-if not args.test:
+if not args.x:
+    Popen(f'rm -fv {condor_dir}/jobs.dag*',shell=True).communicate()
     Popen(('condor_submit_dag','jobs.dag')).communicate()
 

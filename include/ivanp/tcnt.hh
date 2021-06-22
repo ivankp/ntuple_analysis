@@ -32,7 +32,7 @@ public:
     const int minutes = (dt-hours*3600)/60;
     const int seconds = (dt-hours*3600-minutes*60);
 
-    ss.str("\r");
+    ss.str({});
     ss.width(width[0]);
     ss << cnt << " | ";
     ss.width(width[1]);
@@ -61,6 +61,7 @@ prt_sec:
     else ss.fill(' ');
 prt_ms: ;
 
+    putchar('\r');
     const auto& s = ss.str();
     printf(s.c_str());
     for (int i=width[2]-s.size(); i>0; --i) putchar(' ');

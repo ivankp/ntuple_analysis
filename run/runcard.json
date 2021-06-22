@@ -16,7 +16,7 @@
   },
   "binning": "binning.json",
   "output": "histograms.root",
-  "-reweight": [{
+  "-reweighting": [{
     "ren_fac": [ [1,1],[0.5,0.5],[1,0.5],[0.5,1],[2,1],[1,2],[2,2] ],
     "scale": "HT2",
     "pdf": "CT14nlo",

@@ -333,8 +333,8 @@ int main(int argc, char* argv[]) {
 
   // Prepare for reweighting
   std::vector<reweighter> reweighters;
-  if (conf.contains("reweight")) {
-    const auto& defs = conf["reweight"];
+  if (conf.contains("reweighting")) {
+    const auto& defs = conf["reweighting"];
     reweighters.reserve(defs.size());
     // conversion defined in reweighter_json.hh
     for (reweighter::args_struct def : defs) {
