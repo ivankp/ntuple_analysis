@@ -78,12 +78,11 @@ void loop_xsec(TDirectory* dir, double factor) {
   }
 }
 
-bool opt_x = false, opt_e = false;
+bool opt_x = false;
 #define TOGGLE(x) x = !x
 
 void print_usage(const char* prog) {
   cout << "usage: " << prog << " [options ...] output.root input1.root [...]\n"
-    "  -e           scale and pdf envelopes\n"
     "  -x           convert weight to cross section\n"
     "               and divide by bin width\n"
     "  -h, --help   display this help text and exit\n";
@@ -107,7 +106,6 @@ int main(int argc, char* argv[]) {
     switch (o) {
       case 'h': print_usage(argv[0]); return 0;
       case 'x': TOGGLE(opt_x); break;
-      case 'e': TOGGLE(opt_e); break;
       default : return 1;
     }
   }

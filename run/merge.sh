@@ -3,7 +3,7 @@ set -e
 err(){ echo "$1" >&2; exit 1; }
 
 [ "$#" -ne 2 ] && err "usage: $0 out_dir merged_dir"
-[ ! -d "$1"  ] && err "input directory \"$1\" does not exist"
+[ ! -d "$1"  ] && err "\"$1\" is not a directory"
 
 path="$PWD"
 while [ "$path" != '/' ]; do

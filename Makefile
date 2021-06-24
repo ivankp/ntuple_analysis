@@ -23,7 +23,8 @@ LHAPDF_PREFIX   := $(shell lhapdf-config --prefix)
 LHAPDF_CPPFLAGS := $(shell lhapdf-config --cppflags)
 LHAPDF_LDLIBS   := $(shell lhapdf-config --libs) -Wl,-rpath=$(LHAPDF_PREFIX)/lib
 
-EXE := bin/hist bin/merge
+MAIN := grep -l '^\s*int\s\+main\s*(' src/*.cc | sed 's:^src/\(.*\)\.cc$$:bin/\1:'
+EXE := $(shell $(MAIN))
 
 all: $(EXE)
 
@@ -35,6 +36,10 @@ bin/hist: .build/reweighter.o .build/Higgs2diphoton.o
 C_merge := $(ROOT_CPPFLAGS)
 LF_merge := $(ROOT_LDFLAGS)
 L_merge := $(ROOT_LDLIBS)
+
+C_envelopes := $(ROOT_CPPFLAGS) $(LHAPDF_CPPFLAGS)
+LF_envelopes := $(ROOT_LDFLAGS)
+L_envelopes := $(ROOT_LDLIBS) $(LHAPDF_LDLIBS)
 
 C_reweighter := $(ROOT_CPPFLAGS)
 
