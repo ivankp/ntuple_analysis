@@ -1,6 +1,7 @@
 #include <array>
 #include <tuple>
 #include <map>
+#include <unordered_map>
 #include <regex>
 #include <stdexcept>
 
@@ -37,6 +38,11 @@ TClass* get_class(const char* name) {
   return classes[class_ptr->GetName()] = class_ptr;
 }
 
+std::unordered_map<std::string,LHAPDF::PDFSet> pdf_sets;
+const LHAPDF::PDFSet* get_pdf_set(const std::string& name) {
+  return &pdf_sets.try_emplace(name,name).first->second;
+}
+
 template <typename T>
 bool inherits_from(TClass* c) {
   return c->InheritsFrom(T::Class());
@@ -53,36 +59,32 @@ T get_obj(TDirectory* dir, const char* name) {
     return dynamic_cast<T&>(*dir->Get(name));
 }
 
-// template <typename H>
-// bool scale_var_impl(const std::array<H*,3>& h) {
-//   if (!(h[0] && h[1] && h[2])) return false;
-//   const auto w = h | [](auto* h){
-//     return std::make_tuple(h->GetArray(), h->GetSumw2()->GetArray());
-//   };
-//   for (auto i = h[0]->GetNcells(); i--; ) {
-//     const auto v = std::get<0>(w[0])[i];
-//     auto& u = std::get<0>(w[1])[i];
-//     auto& d = std::get<0>(w[2])[i];
-//     if (v > u) u = v;
-//     if (v < d) d = v;
-//   }
-//   return true;
-// }
-// void scale_var(const std::array<TH1*,3>& h) {
-//   if (![&]<typename... H>(ivanp::type_sequence<H...>){
-//     return ( scale_var_impl( h | [](auto* h){ return dynamic_cast<H*>(h); } )
-//       || ... );
-//   }(ivanp::type_sequence<
-//     TH1D, TH1F
-//   >{})) throw std::runtime_error(cat(
-//     h[0]->GetName()," has unexpected type ",h[0]->ClassName()));
-// }
-
-void scale_var(TH1* h, TH1* u, TH1* d) {
-  for (auto i = h->GetNcells(); i--; ) {
-    const auto v = h->GetBinContent(i);
-    if (v > u->GetBinContent(i)) u->SetBinContent(i,v);
-    if (v < d->GetBinContent(i)) d->SetBinContent(i,v);
+void scale_unc(const std::vector<TH1*>& vars, TH1* u, TH1* d) {
+  const auto n = u->GetNcells();
+  for (TH1* h : vars)
+    for (auto i = n; i--; ) {
+      const auto v = h->GetBinContent(i);
+      if (v > u->GetBinContent(i)) u->SetBinContent(i,v);
+      if (v < d->GetBinContent(i)) d->SetBinContent(i,v);
+    }
+}
+void pdf_unc(
+  const LHAPDF::PDFSet* pdf_set,
+  const std::vector<TH1*>& vars,
+  TH1* u,
+  TH1* d
+) {
+  const auto nbins = u->GetNcells();
+  const auto nvars = vars.size();
+  std::vector<double> values(nvars);
+  LHAPDF::PDFUncertainty unc;
+  for (auto i = nbins; i--; ) {
+    for (auto j = nvars; j--; )
+      values[j] = vars[j]->GetBinContent(i);
+    pdf_set->uncertainty(unc,values);
+    const double v = values[0];
+    u->SetBinContent(i,v+unc.errplus);
+    d->SetBinContent(i,v-unc.errminus);
   }
 }
 
@@ -90,7 +92,7 @@ void loop_envelopes(
   const std::array<TDirectory*,3>& out,
   TDirectory* nom,
   const std::vector<TDirectory*>& vars,
-  bool pdf
+  const LHAPDF::PDFSet* pdf_set
 ) {
   for (TObject* key : *nom->GetListOfKeys()) {
     const char* const name = key->GetName();
@@ -98,25 +100,32 @@ void loop_envelopes(
     TClass* const class_ptr = get_class(class_name);
     if (inherits_from<TDirectory>(class_ptr)) {
       loop_envelopes(
-        out | [name](TDirectory* d){ return d->mkdir(name); },
+        out | [&](TDirectory* d){ return d ? d->mkdir(name) : nullptr; },
         read_key<TDirectory>(key),
-        vars | [name](TDirectory* d){ return &get_obj<TDirectory&>(d,name); },
-        pdf
+        vars | [&](TDirectory* d){ return &get_obj<TDirectory&>(d,name); },
+        pdf_set
       );
     } else if (inherits_from<TH1>(class_ptr)) {
-      auto h = out | [h=read_key<TH1>(key),i=-2](TDirectory* d) mutable {
-        d->cd();
-        h = static_cast<TH1*>(h->Clone());
-        if (!++i) h->Sumw2(false);
-        return h;
-      };
-      for (TDirectory* d : vars) {
-        h[0] = &get_obj<TH1&>(d,name);
-        if (pdf) {
-        } else {
-          // std::apply(scale_var,h);
-          scale_var(h[0],h[1],h[2]);
-        }
+      TH1* hs[3];
+      TH1* h = read_key<TH1>(key);
+      hs[0] = h; // always needed for pdf uncertainties
+      for (unsigned i=(out[0]?0:1); i<3; ++i) {
+        out[i]->cd();
+        hs[i] = h = static_cast<TH1*>(h->Clone());
+        if (i==1) h->Sumw2(false); // stat. unc. only for nominal
+      }
+      if (pdf_set) {
+        const size_t n = vars.size();
+        std::vector<TH1*> pdf_vars(n+1);
+        pdf_vars[0] = hs[0];
+        for (size_t i=0; i<n; ++i)
+          pdf_vars[i+1] = &get_obj<TH1&>(vars[i],name);
+        pdf_unc(pdf_set, pdf_vars, hs[1], hs[2]);
+      } else {
+        scale_unc(
+          vars | [&](TDirectory* d){ return &get_obj<TH1&>(d,name); },
+          hs[1], hs[2]
+        );
       }
     }
   }
@@ -194,23 +203,33 @@ int main(int argc, char* argv[]) {
       fout.WriteObject(read_key(key),name);
     }
   }
-  for (const auto& [name,v] : variations) {
-    const auto fullname = cat(name[0],name[1]," "+!name[2].size(),name[2]);
-    cout << fullname << endl;
-    // for (const auto& [mu,d] : v.scale)
-    //   cout << "  " << mu[0] << ' ' << mu[1]  << ": " << d->GetName() << endl;
-    // for (const auto& [i,d] : v.pdf)
-    //   cout << "  " << i << ": " << d->GetName() << endl;
-
-    loop_envelopes( // scale variations
-      { fout.mkdir(fullname.c_str()),
-        fout.mkdir(cat(fullname," scale_up").c_str()),
-        fout.mkdir(cat(fullname," scale_down").c_str())
-      },
-      v.nom,
-      v.scale | [](const auto& x){ return x.second; },
-      false
-    );
+  for (const auto& [lbl,v] : variations) {
+    const auto name = cat(lbl[0],lbl[1]," "+!lbl[2].size(),lbl[2]);
+    cout << name << endl;
+    if (!v.scale.empty()) { // scale variations
+      loop_envelopes(
+        { fout.mkdir(name.c_str()),
+          fout.mkdir((name+" scale_up").c_str()),
+          fout.mkdir((name+" scale_down").c_str())
+        },
+        v.nom,
+        v.scale | [](const auto& x){ return x.second; },
+        nullptr
+      );
+    }
+    if (!v.pdf.empty()) { // PDF variations
+      const auto* pdf_set = get_pdf_set(lbl[1]);
+      cout << pdf_set->description() << endl;
+      loop_envelopes(
+        { v.scale.empty() ? fout.mkdir(name.c_str()) : nullptr,
+          fout.mkdir((name+" pdf_up").c_str()),
+          fout.mkdir((name+" pdf_down").c_str())
+        },
+        v.nom,
+        v.pdf | [](const auto& x){ return x.second; },
+        pdf_set
+      );
+    }
   }
 
   fout.Write(0,TObject::kOverwrite);
