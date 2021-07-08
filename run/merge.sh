@@ -37,8 +37,7 @@ while read -r name; do
   if [ -n "$m" ]; then
     # merge histograms
     # scale to cross section (-x)
-    # produce scale and PDF variation envelopes (-e)
-    "$path/bin/merge" -ex "$out" "$name"*.root
+    "$path/bin/merge" -x "$out" "$name"*.root
   fi
 done
 

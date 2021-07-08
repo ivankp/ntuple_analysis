@@ -8,6 +8,10 @@ from itertools import product
 argparser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
 )
+argparser.add_argument('-a', type=str, default='../../bin/hist',
+    help='analysis executable')
+argparser.add_argument('-d', type=str, default='.',
+    help='base output directory')
 argparser.add_argument('-m',action='store_true',
     help='add "+IsMediumJob = True" to condor jobs')
 argparser.add_argument('-n', type=int, default=int(25e6),
@@ -26,20 +30,18 @@ def mkdirs(*ds):
         if not os.path.isdir(d):
             os.makedirs(d)
 
-exe = '../../bin/hist'
-
 selection = [{
     'part': ['B','RS','I','V'],
     'njets': [1],
     'particle': ['H'],
     'energy': [13],
     'info': ['GGFHT pt25.0 eta4.5']
-# },{
-#     'part': ['B','RS','I','V'],
-#     'njets': [2,3],
-#     'particle': ['H'],
-#     'energy': [13],
-#     'info': ['ED GGFHT pt25.0 eta4.5']
+},{
+    'part': ['B','RS','I','V'],
+    'njets': [2,3],
+    'particle': ['H'],
+    'energy': [13],
+    'info': ['ED GGFHT pt25.0 eta4.5']
 }]
 
 db = sqlite3.connect('../sql/ntuples.db')
@@ -105,10 +107,18 @@ WHERE
 
     return chunks
 
-args.t = '_'+re.sub(r'\s+','-',args.t)
-condor_dir = 'condor'+args.t
-out_dir = 'out'+args.t
-merged_dir = 'merged'+args.t
+args.t = args.t.strip()
+if len(args.t)>0:
+    args.t = re.sub(r'\s+','-',args.t)
+    args.t = '_'+args.t
+args.d = args.d.strip()
+if len(args.d)>0:
+    args.d = args.d.strip('/')+'/'
+
+condor_dir = args.d+'condor'+args.t
+out_dir = args.d+'out'+args.t
+merged_dir = args.d+'merged'+args.t
+
 mkdirs(condor_dir,out_dir)
 os.chdir(condor_dir)
 
@@ -118,7 +128,7 @@ def make_job(chunk):
         f.write(f'''\
 #!/bin/bash
 export LD_LIBRARY_PATH={LD_LIBRARY_PATH}\n
-{exe} - << CARD
+{args.a} - << CARD
 ''' + json.dumps({
         'input': { 'files': chunk[1] },
         'rootS': chunk[2],
@@ -128,15 +138,7 @@ export LD_LIBRARY_PATH={LD_LIBRARY_PATH}\n
             'njets_min': chunk[3]
         },
         'binning': '../binning.json',
-        'output': f'../{out_dir}/{chunk[0]}.root',
-        'reweighting': [{
-            'pdf': 'CT14nlo',
-            'pdf_var': True,
-            'ren_fac': [
-                [1,1], [0.5,0.5], [1,0.5], [0.5,1], [2,1], [1,2], [2,2]
-            ],
-            'scale': 'HT2'
-        }]
+        'output': f'../{out_dir}/{chunk[0]}.root'
     }, indent=2, separators=(',',': ')) + '\nCARD\n')
 
     os.chmod(script,0o775)

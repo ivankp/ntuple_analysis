@@ -23,10 +23,18 @@ LHAPDF_PREFIX   := $(shell lhapdf-config --prefix)
 LHAPDF_CPPFLAGS := $(shell lhapdf-config --cppflags)
 LHAPDF_LDLIBS   := $(shell lhapdf-config --libs) -Wl,-rpath=$(LHAPDF_PREFIX)/lib
 
-MAIN := grep -l '^\s*int\s\+main\s*(' src/*.cc | sed 's:^src/\(.*\)\.cc$$:bin/\1:'
+MAIN := \
+  find src -type f -name '*.cc' \
+  | xargs grep -l '^\s*int\s\+main\s*(' \
+  | sed 's:^src/\(.*\)\.cc$$:bin/\1:'
 EXE := $(shell $(MAIN))
 
 all: $(EXE)
+
+C_studies/photon_cuts := $(ROOT_CPPFLAGS) $(FJ_CPPFLAGS) $(LHAPDF_CPPFLAGS)
+LF_studies/photon_cuts := $(ROOT_LDFLAGS)
+L_studies/photon_cuts := $(ROOT_LDLIBS) $(FJ_LDLIBS) $(LHAPDF_LDLIBS)
+bin/studies/photon_cuts: .build/reweighter.o .build/Higgs2diphoton.o
 
 C_hist := $(ROOT_CPPFLAGS) $(FJ_CPPFLAGS) $(LHAPDF_CPPFLAGS)
 LF_hist := $(ROOT_LDFLAGS)

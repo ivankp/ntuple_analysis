@@ -26,6 +26,7 @@
 #include "json/binning.hh"
 #include "ivanp/vec4.hh"
 #include "Higgs2diphoton.hh"
+#include "ivanp/ycombinator.hh"
 
 #define STR1(x) #x
 #define STR(x) STR1(x)
@@ -43,15 +44,6 @@ using ivanp::vec4;
 using ivanp::branch_reader;
 
 using namespace ivanp::cont::ops::map;
-
-template <typename F>
-struct Ycombinator {
-  F f;
-  template <typename... Args>
-  decltype(auto) operator()(Args&&... args) const {
-    return f(std::ref(*this), std::forward<Args>(args)...);
-  }
-};
 
 json read_json(const char* filename) {
   try {
@@ -578,7 +570,7 @@ int main(int argc, char* argv[]) {
   fout.SetCompressionLevel(9);
 
   // convert histograms to TH1D
-  Ycombinator([&](auto f, TDirectory* dir, auto&& get){
+  ivanp::Ycombinator([&](auto f, TDirectory* dir, auto&& get){
     using type = std::remove_cvref_t<
       decltype(get(std::declval<const bin_t&>())) >;
     if constexpr (!std::is_same_v<type,basic_bin_t>) {

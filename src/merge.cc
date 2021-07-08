@@ -102,7 +102,7 @@ int main(int argc, char* argv[]) {
       }
     }
   }
-  for (int o; (o = getopt(argc,argv,"hxe")) != -1; ) { // short options
+  for (int o; (o = getopt(argc,argv,"hx")) != -1; ) { // short options
     switch (o) {
       case 'h': print_usage(argv[0]); return 0;
       case 'x': TOGGLE(opt_x); break;
