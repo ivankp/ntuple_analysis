@@ -200,8 +200,7 @@ void save_tags_impl(std::stringstream& ss) {
   }
   ss << "]]";
 
-  using type = std::remove_cvref_t<
-    decltype(std::declval<const T&>()[{}]) >;
+  using type = std::remove_cvref_t< decltype(std::declval<const T&>()[0]) >;
   if constexpr (!std::is_same_v<type,basic_bin_t>)
     save_tags_impl<type,false>(ss);
 }
