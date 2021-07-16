@@ -31,11 +31,6 @@ EXE := $(shell $(MAIN))
 
 all: $(EXE)
 
-C_studies/photon_cuts := $(ROOT_CPPFLAGS) $(FJ_CPPFLAGS) $(LHAPDF_CPPFLAGS)
-LF_studies/photon_cuts := $(ROOT_LDFLAGS)
-L_studies/photon_cuts := $(ROOT_LDLIBS) $(FJ_LDLIBS) $(LHAPDF_LDLIBS)
-bin/studies/photon_cuts: .build/reweighter.o .build/Higgs2diphoton.o
-
 C_hist := $(ROOT_CPPFLAGS) $(FJ_CPPFLAGS) $(LHAPDF_CPPFLAGS)
 LF_hist := $(ROOT_LDFLAGS)
 L_hist := $(ROOT_LDLIBS) $(FJ_LDLIBS) $(LHAPDF_LDLIBS)

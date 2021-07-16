@@ -539,8 +539,8 @@ int main(int argc, char* argv[]) {
 
     if (njets < njets_min) continue; // require minimum number of jets
 
+    // Define observables and fill histograms #######################
     // ##############################################################
-    // Define observables and fill histograms
 
     const double H_pT = higgs.pt();
     h_H_pT(H_pT);

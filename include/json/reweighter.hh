@@ -31,8 +31,8 @@ struct adl_serializer<reweighter::args_struct> {
     args.pdf = j.at("pdf");
     args.scale = j.at("scale");
     args.pdf_var = j.at("pdf_var");
-    for (const reweighter::ren_fac<double>& k : j.at("ren_fac"))
-      args.add_scale(k);
+    for (reweighter::ren_fac<double> k : j.at("ren_fac"))
+      args.add_scale(std::move(k));
   }
 };
 
