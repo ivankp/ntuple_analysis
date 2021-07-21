@@ -1,3 +1,3 @@
 [submodule "histograms"]
 	path = histograms
-	url = git@github.com:ivankp/histograms.git
+	url = https://github.com/ivankp/histograms.git
