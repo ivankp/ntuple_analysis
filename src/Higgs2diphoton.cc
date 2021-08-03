@@ -3,6 +3,8 @@
 
 #include "Higgs2diphoton.hh"
 
+using ivanp::vec4;
+
 Higgs2diphoton::Higgs2diphoton(seed_type seed)
 : rng(seed ? seed : std::chrono::system_clock::now().time_since_epoch().count()),
   phi_dist(0.,2*M_PI), cts_dist(-1.,1.)
@@ -27,9 +29,8 @@ Higgs2diphoton::operator()(const vec_t& Higgs, bool new_kin) {
   auto photon = cm_photon;
   photon.rotate_u_z(boost.normalized()) *= E;
 
-  photons_type diphoton {{ {photon,E}, {-photon,E} }};
-  std::get<0>(diphoton) >> boost;
-  std::get<1>(diphoton) >> boost;
-
-  return diphoton;
+  return {
+    vec4(photon, E) >> boost,
+    vec4(photon,-E) >> boost
+  };
 }
