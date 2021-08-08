@@ -125,11 +125,11 @@ void loop(
 
       stmt.reset().clear();
       int v=0;
-      stmt.bind(++v,axis);
-      stmt.bind(++v,std::move(bins).str());
       try {
         for (const auto& x : labels2)
           stmt.bind(++v,x);
+        stmt.bind(++v,axis);
+        stmt.bind(++v,std::move(bins).str());
       } catch (const ivanp::sqlite_error& e) {
         cerr << "\033[31m" "too few labels specified" "\033[0m\n" ;
         throw;
@@ -160,12 +160,13 @@ int main(int argc, char* argv[]) {
   { std::stringstream sql;
     sql <<
       "BEGIN;"
-      "CREATE TABLE hist (\n"
-      "  axis INTEGER\n"
-      ", bins TEXT\n";
+      "CREATE TABLE hist (\n";
     for (int i=arg_in_end; i<argc; ++i)
-      sql << ", " << argv[i] << " TEXT\n";
-    sql << ");";
+      sql << (i==arg_in_end ? "  " : ", ") << argv[i] << " TEXT\n";
+    sql <<
+      ", axis INTEGER\n"
+      ", bins TEXT\n"
+      ");";
 
     sql << "CREATE TABLE axes (\n"
       "  id INTEGER PRIMARY KEY\n"
