@@ -23,28 +23,32 @@ LHAPDF_PREFIX   := $(shell lhapdf-config --prefix)
 LHAPDF_CPPFLAGS := $(shell lhapdf-config --cppflags)
 LHAPDF_LDLIBS   := $(shell lhapdf-config --libs) -Wl,-rpath=$(LHAPDF_PREFIX)/lib
 
-MAIN := \
+FIND_MAIN := \
   find src -type f -name '*.cc' \
   | xargs grep -l '^\s*int\s\+main\s*(' \
   | sed 's:^src/\(.*\)\.cc$$:bin/\1:'
-EXE := $(shell $(MAIN))
+EXE := $(shell $(FIND_MAIN))
 
 all: $(EXE)
+
+C_merge := $(ROOT_CPPFLAGS)
+LF_merge := $(ROOT_LDFLAGS)
+L_merge := -L$(ROOT_LIBDIR) -lCore -lRIO -lHist
+
+C_envelopes := $(ROOT_CPPFLAGS) $(LHAPDF_CPPFLAGS)
+LF_envelopes := $(ROOT_LDFLAGS)
+L_envelopes := -L$(ROOT_LIBDIR) -lCore -lRIO -lHist $(LHAPDF_LDLIBS)
+
+C_root2sql := $(ROOT_CPPFLAGS)
+LF_root2sql := $(ROOT_LDFLAGS)
+L_root2sql := -L$(ROOT_LIBDIR) -lCore -lRIO -lHist -lsqlite3
+
+C_reweighter := $(ROOT_CPPFLAGS)
 
 C_hist := $(ROOT_CPPFLAGS) $(FJ_CPPFLAGS) $(LHAPDF_CPPFLAGS)
 LF_hist := $(ROOT_LDFLAGS)
 L_hist := $(ROOT_LDLIBS) $(FJ_LDLIBS) $(LHAPDF_LDLIBS)
 bin/hist: .build/reweighter.o .build/Higgs2diphoton.o
-
-C_merge := $(ROOT_CPPFLAGS)
-LF_merge := $(ROOT_LDFLAGS)
-L_merge := $(ROOT_LDLIBS)
-
-C_envelopes := $(ROOT_CPPFLAGS) $(LHAPDF_CPPFLAGS)
-LF_envelopes := $(ROOT_LDFLAGS)
-L_envelopes := $(ROOT_LDLIBS) $(LHAPDF_LDLIBS)
-
-C_reweighter := $(ROOT_CPPFLAGS)
 
 #####################################################################
 
