@@ -15,15 +15,14 @@ inline const char* cstr(const std::string& x) noexcept { return x.c_str(); }
 
 namespace impl {
 
+template <typename T>
 [[nodiscard]]
 [[gnu::always_inline]]
-inline std::string_view to_string_view(std::string_view x) noexcept {
-  return x;
-}
-[[nodiscard]]
-[[gnu::always_inline]]
-inline std::string_view to_string_view(const char& x) noexcept {
-  return { &x, 1 };
+inline std::string_view to_string_view(const T& x) noexcept {
+  if constexpr (std::is_same_v<T,char>)
+    return { &x, 1 };
+  else
+    return x;
 }
 
 [[gnu::always_inline]]
@@ -57,9 +56,9 @@ inline auto cat(T... x) -> std::enable_if_t<
   (sizeof...(x) > 1) && (impl::is_sv<T> && ...),
   std::string
 > {
-  std::string s;
-  s.reserve((x.size() + ...));
-  (s += ... += x);
+  std::string s((x.size() + ...),{});
+  char* p = s.data();
+  ( ( memcpy(p, x.data(), x.size()), p += x.size() ), ...);
   return s;
 }
 
@@ -107,11 +106,11 @@ struct chars_less {
   bool operator()(const char* a, const char* b) const noexcept {
     return strcmp(a,b) < 0;
   }
-  template <typename T>
+  template <typename T> requires std::is_class_v<T>
   bool operator()(const T& a, const char* b) const noexcept {
     return a < b;
   }
-  template <typename T>
+  template <typename T> requires std::is_class_v<T>
   bool operator()(const char* a, const T& b) const noexcept {
     return a < b;
   }
